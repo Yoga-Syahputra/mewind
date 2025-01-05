@@ -10,6 +10,9 @@ def preprocess_data(df):
     # Convert numeric columns
     numeric_columns = ['TX', 'RH_AVG', 'RR', 'FF_X', 'FF_AVG']
     df[numeric_columns] = df[numeric_columns].apply(pd.to_numeric, errors='coerce')
+    
+    # Fill NaN with 0
+    df.dropna(inplace=True)
 
     # Handle missing values using interpolation
     df.interpolate(method='linear', inplace=True)  
@@ -21,15 +24,6 @@ def preprocess_data(df):
     df['RR'] = np.log1p(df['RR'])
     df['FF_AVG'] = np.log1p(df['FF_AVG'])
 
-    return df
-
-def create_features(df):
-    """Create time-based and lag features."""
-    # Extract time-based features
-    df['month'] = df['TANGGAL'].dt.month
-    df['day'] = df['TANGGAL'].dt.day
-    df['day_of_week'] = df['TANGGAL'].dt.dayofweek
-    
     return df
 
 def split_data(df, train_size=0.7, val_size=0.2):
@@ -52,4 +46,3 @@ def scale_data(train_data, val_data, test_data, feature_columns):
         test_scaled = scaler.transform(test_data[feature_columns])
 
     return train_scaled, val_scaled, test_scaled, scaler
-

@@ -1,7 +1,7 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template 
 import os
 import pandas as pd
-from utils.preprocessing import preprocess_data, create_features, split_data, scale_data
+from utils.preprocessing import preprocess_data, split_data, scale_data
 from utils.svm_model import train_svm_model
 from utils.lstm_model import create_sequences, train_lstm_model
 from tensorflow.keras.models import load_model
@@ -57,7 +57,7 @@ def get_history():
             return jsonify({'error': 'No dataset found. Please upload a dataset first.'}), 404
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-    
+
 @app.route('/upload', methods=['POST'])
 def upload_file():
     """Handle file upload."""
@@ -90,7 +90,6 @@ def get_dataset():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-
 @app.route('/train/<model_type>', methods=['POST'])
 def train_model(model_type):
     """Train the specified model (SVM or LSTM)."""
@@ -106,38 +105,48 @@ def train_model(model_type):
             df['TANGGAL'] = pd.to_datetime(df['TANGGAL'], errors='coerce')
         df.dropna(subset=['TANGGAL'], inplace=True)
         df = preprocess_data(df)
-        df = create_features(df)
 
         # Define feature columns
         feature_columns = ['TX', 'RH_AVG', 'RR', 'FF_X']
 
-        # Split and scale data
+        # Split data
         train_data, val_data, _ = split_data(df)
-        train_scaled, val_scaled, _, scaler = scale_data(train_data, val_data, None, feature_columns)
 
-        # Train model
+
         if model_type == 'lstm':
+            # Scale data for LSTM
+            train_scaled, val_scaled, _, lstm_scaler = scale_data(train_data, val_data, None, feature_columns)
             X_train, y_train = create_sequences(train_scaled, seq_length=3)
             X_val, y_val = create_sequences(val_scaled, seq_length=3)
+
+            # Train LSTM model
             model, metrics = train_lstm_model(X_train, y_train, X_val, y_val)
             model.save(os.path.join(MODELS_PATH, 'lstm_model.h5'))
+
+            # Save LSTM scaler
+            joblib.dump(lstm_scaler, os.path.join(MODELS_PATH, 'lstm_scaler.pkl'))
+
         elif model_type == 'svm':
+            # Scale data for SVM
+            train_scaled, val_scaled, _, svm_scaler = scale_data(train_data, val_data, None, feature_columns)
+
+            # Train SVM model
             model, metrics = train_svm_model(train_scaled, val_scaled)
             joblib.dump(model, os.path.join(MODELS_PATH, 'svm_model.pkl'))
+
+            # Save SVM scaler
+            joblib.dump(svm_scaler, os.path.join(MODELS_PATH, 'svm_scaler.pkl'))
+
         else:
             return jsonify({'error': 'Invalid model type. Use "svm" or "lstm".'}), 400
-
-        # Save scaler
-        joblib.dump(scaler, os.path.join(MODELS_PATH, 'scaler.pkl'))
 
         return jsonify({'metrics': metrics})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-     
-    
+
 @app.route('/predict/<model_type>', methods=['POST'])
 def predict_model(model_type):
-    """Predict wind speed using the specified model."""
+    """Predict wind speed for multiple days using the specified model."""
     try:
         # Load scaler
         scaler_path = os.path.join(MODELS_PATH, 'scaler.pkl')
@@ -150,67 +159,102 @@ def predict_model(model_type):
         if not data:
             return jsonify({'error': 'No input data provided.'}), 400
 
-        # Prepare input data
         feature_columns = ['TX', 'RH_AVG', 'RR', 'FF_X']
+
         if model_type == 'svm':
+            # Load dataset for historical data (if necessary for features, else skip this)
+            if not os.path.exists(DATA_PATH):
+                return jsonify({'error': 'Dataset not found. Please upload a dataset first.'}), 404
+
+            df = pd.read_csv(DATA_PATH)
+            df['TANGGAL'] = pd.to_datetime(df['TANGGAL'], errors='coerce')
+            df = df.sort_values('TANGGAL')
+
+            # Extract historical data for visualization (not for prediction)
+            forecast_date = pd.to_datetime(data.get('forecast_date'))
+            if not forecast_date:
+                return jsonify({'error': 'Forecast date is required.'}), 400
+
+            historical_data = df[df['TANGGAL'] < forecast_date].tail(2)
+            if len(historical_data) < 2:
+                # If no historical data, return default empty values for visualization
+                historical_data = pd.DataFrame({
+                    'TANGGAL': [forecast_date - pd.Timedelta(days=2), forecast_date - pd.Timedelta(days=1)],
+                    'FF_X': [0, 0]
+                })
+
+            # Prepare input for SVM prediction
             input_data = [[
                 data.get('temperature', 0),
                 data.get('humidity', 0),
                 data.get('rainfall', 0),
                 data.get('wind_gust', 0)
             ]]
-
-            # Validate feature length
-            if len(input_data[0]) != len(feature_columns):
-                return jsonify({'error': f"Expected {len(feature_columns)} features, but got {len(input_data[0])}."}), 400
-
-            # Scale input data
             input_scaled = scaler.transform(input_data)
 
-            # Load SVM model and predict
+            # Load SVM model
             model_path = os.path.join(MODELS_PATH, 'svm_model.pkl')
             if not os.path.exists(model_path):
                 return jsonify({'error': 'SVM model not found. Train the model first.'}), 404
             model = joblib.load(model_path)
-            prediction = float(model.predict(input_scaled)[0])  # Ensure float for JSON
+
+            # Predict for the given input
+            prediction = float(model.predict(input_scaled)[0])
+
+            # Combine historical data with the new prediction
+            dates = list(historical_data['TANGGAL'].dt.strftime('%Y-%m-%d'))
+            dates.append(forecast_date.strftime('%Y-%m-%d'))
+
+            historical_predictions = list(historical_data['FF_X'])  # Example feature for visualization
+            predictions = historical_predictions + [prediction]
+
+            response = [{'date': date, 'prediction': pred} for date, pred in zip(dates, predictions)]
 
         elif model_type == 'lstm':
-            seq_length = 3
-            historical_data = data.get('historical_data', [])
-            if len(historical_data) < seq_length:
-                return jsonify({'error': f'LSTM requires at least {seq_length} days of historical data.'}), 400
+            # LSTM Prediction
+            forecast_date = pd.to_datetime(data.get('forecast_date'))
+            if not forecast_date:
+                return jsonify({'error': 'Forecast date is required.'}), 400
 
-            input_data = [[
-                entry.get('temperature', 0),
-                entry.get('humidity', 0),
-                entry.get('rainfall', 0),
-                entry.get('wind_gust', 0)
-            ] for entry in historical_data[-seq_length:]]
+            if not os.path.exists(DATA_PATH):
+                return jsonify({'error': 'Dataset not found. Please upload a dataset first.'}), 404
 
-            # Validate feature length
-            if any(len(row) != len(feature_columns) for row in input_data):
-                return jsonify({'error': 'Invalid number of features in historical data.'}), 400
+            df = pd.read_csv(DATA_PATH)
+            df['TANGGAL'] = pd.to_datetime(df['TANGGAL'], errors='coerce')
+            df = df.sort_values('TANGGAL')
 
-            # Scale and reshape data for LSTM
-            input_scaled = scaler.transform(input_data).reshape(1, seq_length, len(feature_columns))
+            # Extract the last 3 days up to the forecast date
+            sequence_data = df[df['TANGGAL'] <= forecast_date].tail(3)
+            if len(sequence_data) < 3:
+                return jsonify({'error': 'Not enough data for the required sequence.'}), 400
 
-            # Load LSTM model and predict
+            input_data = sequence_data[feature_columns].values
+            input_scaled = scaler.transform(input_data).reshape(1, 3, len(feature_columns))
+
+            # Load LSTM model
             model_path = os.path.join(MODELS_PATH, 'lstm_model.h5')
             if not os.path.exists(model_path):
                 return jsonify({'error': 'LSTM model not found. Train the model first.'}), 404
             model = load_model(model_path)
-            prediction = float(model.predict(input_scaled)[0][0])  # Ensure float for JSON
+
+            # Predict the next day based on the input sequence
+            prediction = float(model.predict(input_scaled)[0][0])  # LSTM prediction
+
+            # Prepare response with the last two days and the predicted day
+            dates = list(sequence_data['TANGGAL'].dt.strftime('%Y-%m-%d'))
+            dates.append(forecast_date.strftime('%Y-%m-%d'))
+            predictions = list(sequence_data['FF_X'])  # Example feature for historical data
+            predictions.append(prediction)
+
+            response = [{'date': date, 'prediction': pred} for date, pred in zip(dates, predictions)]
 
         else:
             return jsonify({'error': 'Invalid model type. Use "svm" or "lstm".'}), 400
 
-        # Return prediction
-        return jsonify({'prediction': prediction})
+        return jsonify(response)
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-
-
 
 if __name__ == '__main__':
     app.run(debug=True)
