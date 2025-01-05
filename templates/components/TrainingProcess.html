@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Training Process</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.js"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.css"
+    />
+  </head>
+  <body
+    class="bg-gray-50 text-gray-900 min-h-screen flex items-center justify-center"
+  >
+    <main
+      class="container mx-auto p-6 bg-white rounded-lg shadow-xl space-y-6"
+      data-aos="fade-up"
+    >
+      <!-- Title and Description -->
+      <div class="text-center">
+        <h1 class="text-3xl font-bold text-[#0D3B5D]">
+          Train Machine Learning Models
+        </h1>
+        <p class="text-gray-500 mt-2">
+          Train SVM and LSTM models using the uploaded dataset.
+        </p>
+      </div>
+
+      <!-- Filter Section -->
+      <div
+        class="flex items-center justify-between space-y-4 md:space-y-0 md:space-x-4"
+        data-aos="fade-right"
+      >
+        <div class="flex items-center space-x-2">
+          <label for="dataCount" class="text-gray-700 font-semibold"
+            >Filter by:</label
+          >
+          <select
+            id="dataCount"
+            class="px-4 py-2 border rounded-lg focus:outline-none focus:ring focus:ring-blue-300"
+          >
+            <option value="all">All Data</option>
+            <option value="10">Last 10 Rows</option>
+            <option value="50">Last 50 Rows</option>
+            <option value="100">Last 100 Rows</option>
+          </select>
+        </div>
+        <button
+          onclick="filterData()"
+          class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 focus:ring focus:ring-blue-300"
+        >
+          Apply Filter
+        </button>
+      </div>
+
+      <!-- Data Table -->
+      <div class="overflow-x-auto" data-aos="fade-right">
+        <table class="table-auto w-full border-collapse border border-gray-300">
+          <thead>
+            <tr class="bg-gray-100">
+              <th
+                class="border border-gray-300 px-4 py-2 text-left font-semibold text-gray-700"
+              >
+                Date
+              </th>
+              <th
+                class="border border-gray-300 px-4 py-2 text-left font-semibold text-gray-700"
+              >
+                Temperature (°C)
+              </th>
+              <th
+                class="border border-gray-300 px-4 py-2 text-left font-semibold text-gray-700"
+              >
+                Humidity (%)
+              </th>
+              <th
+                class="border border-gray-300 px-4 py-2 text-left font-semibold text-gray-700"
+              >
+                Rainfall (mm)
+              </th>
+              <th
+                class="border border-gray-300 px-4 py-2 text-left font-semibold text-gray-700"
+              >
+                Wind Gust (m/s)
+              </th>
+              <th
+                class="border border-gray-300 px-4 py-2 text-left font-semibold text-gray-700"
+              >
+                Wind Speed (m/s)
+              </th>
+            </tr>
+          </thead>
+          <tbody id="dataBody">
+            <!-- Data dynamically inserted -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Training Options -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+        <div class="text-center space-y-2">
+          <h3 class="text-lg font-semibold text-gray-700">SVM Model</h3>
+          <button
+            onclick="startTraining('svm')"
+            class="w-full px-6 py-2 bg-[#0D3B5D] text-white rounded-lg hover:bg-[#0B2D48] focus:ring focus:ring-[#0D3B5D]"
+          >
+            Train SVM Model
+          </button>
+        </div>
+        <div class="text-center space-y-2">
+          <h3 class="text-lg font-semibold text-gray-700">LSTM Model</h3>
+          <button
+            onclick="startTraining('lstm')"
+            class="w-full px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 focus:ring focus:ring-blue-500"
+          >
+            Train LSTM Model
+          </button>
+        </div>
+      </div>
+
+      <!-- Progress Bar -->
+      <div
+        id="progressContainer"
+        class="w-full bg-gray-200 rounded-full h-6 overflow-hidden hidden"
+      >
+        <div
+          id="progressBar"
+          class="bg-[#0D3B5D] h-full transition-all duration-300"
+          style="width: 0%"
+        ></div>
+      </div>
+
+      <!-- Metrics Display -->
+      <!-- Metrics Display -->
+      <div id="metricsContainer" class="mt-6 hidden space-y-3">
+        <h3 class="font-semibold text-lg text-[#0D3B5D]">Training Metrics:</h3>
+        <div class="grid grid-cols-2 gap-4">
+          <p id="train_rmse" class="bg-gray-100 p-3 rounded-lg shadow-inner">
+            Training RMSE: --
+          </p>
+          <p id="train_mse" class="bg-gray-100 p-3 rounded-lg shadow-inner">
+            Training MSE: --
+          </p>
+          <p id="train_mae" class="bg-gray-100 p-3 rounded-lg shadow-inner">
+            Training MAE: --
+          </p>
+          <p id="train_r2" class="bg-gray-100 p-3 rounded-lg shadow-inner">
+            Training R²: --
+          </p>
+        </div>
+
+        <h3 class="font-semibold text-lg text-[#0D3B5D] mt-4">
+          Validation Metrics:
+        </h3>
+        <div class="grid grid-cols-2 gap-4">
+          <p id="val_rmse" class="bg-gray-100 p-3 rounded-lg shadow-inner">
+            Validation RMSE: --
+          </p>
+          <p id="val_mse" class="bg-gray-100 p-3 rounded-lg shadow-inner">
+            Validation MSE: --
+          </p>
+          <p id="val_mae" class="bg-gray-100 p-3 rounded-lg shadow-inner">
+            Validation MAE: --
+          </p>
+          <p id="val_r2" class="bg-gray-100 p-3 rounded-lg shadow-inner">
+            Validation R²: --
+          </p>
+        </div>
+      </div>
+
+      <!-- Proceed to Test -->
+      <button
+        id="proceedToTest"
+        class="w-full bg-blue-500 text-white font-bold py-3 rounded-lg hover:bg-blue-600 focus:outline-none focus:ring focus:ring-blue-300 transition hidden"
+      >
+        Proceed to Testing
+      </button>
+    </main>
+
+    <script>
+      AOS.init({ duration: 1000, once: true });
+
+      async function fetchDataset() {
+        try {
+          const response = await fetch("/dataset");
+          const data = await response.json();
+          return data;
+        } catch (error) {
+          console.error("Failed to fetch dataset:", error);
+          alert("Failed to fetch dataset. Please try again later.");
+          return [];
+        }
+      }
+
+      async function populateTable(dataset) {
+        const dataBody = document.getElementById("dataBody");
+        dataBody.innerHTML = "";
+        dataset.forEach((row) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+                          <td class="border border-gray-300 px-4 py-2 text-gray-700">${
+                            row.TANGGAL || "-"
+                          }</td>
+                          <td class="border border-gray-300 px-4 py-2 text-gray-700">${
+                            row.TX || "-"
+                          }</td>
+                          <td class="border border-gray-300 px-4 py-2 text-gray-700">${
+                            row.RH_AVG || "-"
+                          }</td>
+                          <td class="border border-gray-300 px-4 py-2 text-gray-700">${
+                            row.RR || "-"
+                          }</td>
+                          <td class="border border-gray-300 px-4 py-2 text-gray-700">${
+                            row.FF_X || "-"
+                          }</td>
+                          <td class="border border-gray-300 px-4 py-2 text-gray-700">${
+                            row.FF_AVG || "-"
+                          }</td>
+                        `;
+          dataBody.appendChild(tr);
+        });
+      }
+
+      async function filterData() {
+        const filterValue = document.getElementById("dataCount").value;
+        const dataset = await fetchDataset();
+
+        if (filterValue === "all") {
+          populateTable(dataset);
+        } else {
+          const filteredData = dataset.slice(-parseInt(filterValue));
+          populateTable(filteredData);
+        }
+      }
+
+      async function startTraining(modelType) {
+        const progressContainer = document.getElementById("progressContainer");
+        const progressBar = document.getElementById("progressBar");
+        const metricsContainer = document.getElementById("metricsContainer");
+        const proceedToTest = document.getElementById(
+          "proceedToTest"
+        );
+
+        try {
+          // Show progress bar
+          progressContainer.classList.remove("hidden");
+          progressBar.style.width = "0%";
+
+          const interval = setInterval(() => {
+            let currentWidth = parseInt(progressBar.style.width, 10);
+            if (currentWidth < 90) {
+              progressBar.style.width = currentWidth + 10 + "%";
+            }
+          }, 500);
+
+          // Fetch training API
+          const response = await fetch(`/train/${modelType}`, {
+            method: "POST",
+          });
+          const result = await response.json();
+
+          clearInterval(interval);
+          progressBar.style.width = "100%";
+
+          if (response.ok) {
+            // Extract metrics
+            const trainingMetrics = result.metrics.Training;
+            const validationMetrics = result.metrics.Validation;
+
+            // Update training metrics
+            document.getElementById(
+              "train_rmse"
+            ).textContent = `Training RMSE: ${trainingMetrics.RMSE.toFixed(4)}`;
+            document.getElementById(
+              "train_mse"
+            ).textContent = `Training MSE: ${trainingMetrics.MSE.toFixed(4)}`;
+            document.getElementById(
+              "train_mae"
+            ).textContent = `Training MAE: ${trainingMetrics.MAE.toFixed(4)}`;
+            document.getElementById(
+              "train_r2"
+            ).textContent = `Training R²: ${trainingMetrics.R2.toFixed(4)}`;
+
+            // Update validation metrics
+            document.getElementById(
+              "val_rmse"
+            ).textContent = `Validation RMSE: ${validationMetrics.RMSE.toFixed(
+              4
+            )}`;
+            document.getElementById(
+              "val_mse"
+            ).textContent = `Validation MSE: ${validationMetrics.MSE.toFixed(
+              4
+            )}`;
+            document.getElementById(
+              "val_mae"
+            ).textContent = `Validation MAE: ${validationMetrics.MAE.toFixed(
+              4
+            )}`;
+            document.getElementById(
+              "val_r2"
+            ).textContent = `Validation R²: ${validationMetrics.R2.toFixed(4)}`;
+
+            metricsContainer.classList.remove("hidden");
+            proceedToTest.classList.remove("hidden");
+
+            alert(`Training completed!`);
+          } else {
+            console.error("Error response:", result.error);
+            alert(`Error: ${result.error}`);
+          }
+        } catch (error) {
+          console.error("Training failed:", error);
+          alert("Failed to train model. Please try again.");
+        } finally {
+          progressBar.style.width = "100%";
+        }
+      }
+
+      document
+        .getElementById("proceedToTest")
+        .addEventListener("click", () => {
+          window.location.href = "{{ url_for('testing_process') }}";
+        });
+
+      // Populate table on page load
+      fetchDataset().then(populateTable);
+    </script>
+  </body>
+</html>

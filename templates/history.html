@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>History - Dataset Management</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        background: #f3f4f6;
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+        font-family: "Poppins", sans-serif;
+      }
+      main {
+        flex: 1;
+        padding-top: 5rem;
+        padding-bottom: 2rem;
+      }
+      footer {
+        background-color: #0d3b5d;
+        color: white;
+        text-align: center;
+        padding: 1rem 0;
+      }
+      .table th,
+      .table td {
+        text-align: left;
+        padding: 12px;
+        font-size: 14px;
+      }
+      .table th {
+        background: #f1f5f9;
+        font-weight: bold;
+        color: #374151;
+      }
+      .table td {
+        color: #4b5563;
+      }
+      .table tr:hover {
+        background: #f9fafb;
+      }
+      @media (max-width: 768px) {
+        .table th,
+        .table td {
+          font-size: 12px;
+          padding: 8px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Navbar -->
+    <header class="bg-[#0D3B5D] fixed top-0 w-full z-50 shadow-lg">
+      <div
+        class="container mx-auto flex items-center justify-between py-3 px-6"
+      >
+        <div class="flex items-center gap-3">
+          <img
+            src="../static/images/logo.png"
+            alt="MeWind Logo"
+            class="w-10 h-auto"
+            href="{{url_for('index')}}"
+          />
+          <span class="text-white font-bold text-xl">MeWind</span>
+        </div>
+        <nav class="flex space-x-6">
+          <a
+            href="{{ url_for('index') }}"
+            class="text-white hover:text-blue-300"
+            >Home</a
+          >
+          <a href="{{ url_for('history') }}" class="text-blue-400 font-semibold"
+            >History</a
+          >
+          <a
+            href="{{ url_for('about') }}"
+            class="text-white hover:text-blue-300"
+            >About Us</a
+          >
+          <a
+            href="{{ url_for('forecast') }}"
+            class="text-white hover:text-blue-300"
+            >Forecast</a
+          >
+        </nav>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-6">
+      <div class="text-center mb-8">
+        <h1 class="text-3xl font-bold text-gray-700">
+          Historical Data Management
+        </h1>
+        <p class="mt-2 text-gray-500">
+          View and manage historical wind speed datasets for better predictions
+        </p>
+      </div>
+
+      <!-- Dataset History Table -->
+      <div class="bg-white shadow-md rounded-lg p-6">
+        <div class="flex items-center justify-between mb-6">
+          <div class="flex space-x-3 items-center">
+            <label for="yearFilter" class="text-gray-600 font-semibold"
+              >Filter by Year:</label
+            >
+            <select
+              id="yearFilter"
+              class="px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-600"
+            >
+              <option value="all">All</option>
+              <option value="2022">2022</option>
+              <option value="2023">2023</option>
+              <option value="2024">2024</option>
+            </select>
+          </div>
+          <div class="flex space-x-3 items-center">
+            <label for="entriesToShow" class="text-gray-600 font-semibold"
+              >Show:</label
+            >
+            <select
+              id="entriesToShow"
+              class="px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-600"
+            >
+              <option value="10">10</option>
+              <option value="20">20</option>
+              <option value="100">100</option>
+              <option value="all">All</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Table -->
+        <div class="overflow-x-auto">
+          <table class="table w-full border-collapse">
+            <thead>
+              <tr>
+                <th class="border-b border-gray-300">Date</th>
+                <th class="border-b border-gray-300">Temperature (°C)</th>
+                <th class="border-b border-gray-300">Humidity (%)</th>
+                <th class="border-b border-gray-300">Rainfall (mm)</th>
+                <th class="border-b border-gray-300">Wind Gust (m/s)</th>
+                <th class="border-b border-gray-300">Wind Speed (m/s)</th>
+              </tr>
+            </thead>
+            <tbody id="datasetBody">
+              <!-- Data will be dynamically rendered -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer>
+      <p class="text-sm text-gray-400">
+        © 2024. Developed passionately by
+        <span class="text-blue-400 font-semibold">WindScholars</span>
+      </p>
+    </footer>
+
+    <!-- JavaScript -->
+    <script>
+      async function fetchDataset() {
+        try {
+          const response = await fetch("/dataset"); 
+          const dataset = await response.json();
+
+          if (dataset.error) {
+            alert("Error: " + dataset.error);
+            return [];
+          }
+
+          return dataset;
+        } catch (error) {
+          console.error("Failed to fetch dataset:", error);
+          alert("Failed to fetch dataset. Please try again later.");
+          return [];
+        }
+      }
+
+      // Render dataset into the table
+      async function renderDataset(entriesToShow = 10, yearFilter = "all") {
+        const tableBody = document.getElementById("datasetBody");
+        tableBody.innerHTML = ""; 
+
+        // Fetch data
+        const dataset = await fetchDataset();
+
+        // Filter by year
+        let filteredData = dataset.filter((row) => row.TANGGAL); // Ensure TANGGAL exists
+        if (yearFilter !== "all") {
+          filteredData = filteredData.filter((row) =>
+            row.TANGGAL.startsWith(yearFilter)
+          );
+        }
+
+        // Limit entries to show
+        const dataToRender =
+          entriesToShow === "all"
+            ? filteredData
+            : filteredData.slice(0, parseInt(entriesToShow, 10));
+
+        // Populate table rows
+        dataToRender.forEach((row) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td class="border-b border-gray-300">${row.TANGGAL || "-"}</td>
+            <td class="border-b border-gray-300">${row.TX || "-"}</td>
+            <td class="border-b border-gray-300">${row.RH_AVG || "-"}</td>
+            <td class="border-b border-gray-300">${row.RR || "-"}</td>
+            <td class="border-b border-gray-300">${row.FF_X || "-"}</td>
+            <td class="border-b border-gray-300">${row.FF_AVG || "-"}</td>
+          `;
+          tableBody.appendChild(tr);
+        });
+      }
+
+      // Event listeners for dropdowns
+      document
+        .getElementById("entriesToShow")
+        .addEventListener("change", (e) => {
+          renderDataset(
+            e.target.value,
+            document.getElementById("yearFilter").value
+          );
+        });
+
+      document.getElementById("yearFilter").addEventListener("change", (e) => {
+        renderDataset(
+          document.getElementById("entriesToShow").value,
+          e.target.value
+        );
+      });
+
+      // Render dataset on load
+      renderDataset();
+    </script>
+  </body>
+</html>

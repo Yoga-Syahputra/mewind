@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MeWind - Wind Speed Prediction</title>
+    <link rel="icon" type="image/png" href="../static/images/logo.png" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        font-family: "Poppins", sans-serif;
+      }
+    </style>
+  </head>
+  <body class="bg-gray-50 text-gray-900">
+    <!-- Navbar -->
+    <header class="bg-[#0D3B5D] fixed top-0 w-full z-50 shadow-lg">
+      <div
+        class="container mx-auto flex items-center justify-between py-3 px-6"
+      >
+        <div class="flex items-center gap-3">
+          <img
+            src="../static/images/logo.png"
+            alt="MeWind Logo"
+            class="w-10 h-auto"
+          />
+          <span class="text-white font-bold text-xl">MeWind</span>
+        </div>
+        <nav class="flex space-x-6">
+          <a href="{{ url_for('index') }}" class="text-white hover:text-blue-300"
+            >Home</a
+          >
+          <a
+            href="{{ url_for('history') }}"
+            class="text-white hover:text-blue-300"
+            >History</a
+          >
+          <a
+            href="{{ url_for('about') }}"
+            class="text-white hover:text-blue-300"
+            >About Us</a
+          >
+          <a
+            href="{{ url_for('forecast') }}"
+            class="text-blue-400 hover:text-blue-300"
+            >Forecast</a
+          >
+        </nav>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto mt-24 px-6">
+      <div class="text-center mb-8">
+        <h1 class="text-3xl font-bold text-[#0D3B5D]">Wind Speed Forecast</h1>
+        <p class="text-gray-600 mt-2">
+          Upload data, train & validate, and test the wind speed prediction
+          model
+        </p>
+      </div>
+
+      <!-- Tabs -->
+      <div
+        class="flex justify-center border border-gray-300 bg-gray-100 rounded-lg shadow-sm"
+      >
+        <button
+          id="uploadTab"
+          onclick="showTab('upload')"
+          class="flex-1 py-2 text-center font-semibold text-[#0D3B5D] border-r border-gray-300 focus:outline-none hover:bg-gray-200 transition"
+        >
+          Upload
+        </button>
+        <button
+          id="trainTab"
+          class="flex-1 py-2 text-center font-semibold text-gray-400 border-r border-gray-300 focus:outline-none cursor-not-allowed"
+        >
+          Train
+        </button>
+        <button
+          id="testTab"
+          class="flex-1 py-2 text-center font-semibold text-gray-400 focus:outline-none cursor-not-allowed"
+        >
+          Test
+        </button>
+      </div>
+
+      <!-- Tab Content -->
+      <div id="upload" class="tab-content block mt-6">
+        <div class="bg-white p-6 rounded-lg shadow-md">
+          <label for="upload-file" class="block text-gray-700 font-bold mb-2"
+            >Upload CSV File</label
+          >
+          <input
+            type="file"
+            id="upload-file"
+            accept=".csv"
+            class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#0D3B5D]"
+            onchange="handleFileUpload(event)"
+          />
+        </div>
+      </div>
+
+      <div
+        id="train"
+        class="tab-content hidden mt-6 transition-all duration-500 transform opacity-0 scale-95"
+      >
+        <iframe
+          src="{{ url_for('training_process') }}"
+          class="w-full h-[600px] border-none"
+          onload="handleTrainingCompletion()"
+        ></iframe>
+      </div>
+
+      <div
+        id="test"
+        class="tab-content hidden mt-6 transition-all duration-500 transform opacity-0 scale-95"
+      >
+        <iframe
+          src="{{ url_for('testing_process') }}"
+          class="w-full h-[600px] border-none"
+        ></iframe>
+      </div>
+    </main>
+
+    <!-- Popup Notification -->
+    <div
+      id="popup"
+      class="fixed bottom-5 right-5 bg-gray-800 text-white px-4 py-2 rounded-lg shadow-lg opacity-0 transform scale-95 transition-all duration-300 pointer-events-none"
+      style="z-index: 1000;"
+    >
+      <span id="popup-message"></span>
+    </div>
+
+    <script>
+      // Show Tab Function
+      function showTab(tabId) {
+        document.querySelectorAll(".tab-content").forEach((tab) => {
+          tab.classList.add("opacity-0", "scale-95");
+          setTimeout(() => {
+            tab.classList.add("hidden");
+            tab.classList.remove("block");
+          }, 300);
+        });
+
+        setTimeout(() => {
+          const selectedTab = document.getElementById(tabId);
+          selectedTab.classList.remove("hidden");
+          selectedTab.classList.add("block", "opacity-0", "scale-95");
+          setTimeout(() => {
+            selectedTab.classList.remove("opacity-0", "scale-95");
+            selectedTab.classList.add("opacity-100", "scale-100");
+          }, 10);
+        }, 300);
+
+        const tabs = ["uploadTab", "trainTab", "testTab"];
+        tabs.forEach((tab) => {
+          document
+            .getElementById(tab)
+            .classList.remove("bg-white", "font-bold");
+          document.getElementById(tab).classList.add("text-gray-400");
+        });
+
+        document
+          .getElementById(tabId + "Tab")
+          .classList.add("bg-white", "font-bold");
+        document
+          .getElementById(tabId + "Tab")
+          .classList.remove("text-gray-400");
+      }
+
+      // Show Popup Function
+      function showPopup(message, isSuccess = true) {
+        const popup = document.getElementById("popup");
+        const popupMessage = document.getElementById("popup-message");
+
+        popupMessage.textContent = message;
+        popup.classList.remove(
+          "opacity-0",
+          "scale-95",
+          "bg-red-600",
+          "bg-green-600"
+        );
+        popup.classList.add(isSuccess ? "bg-green-600" : "bg-red-600");
+
+        popup.style.pointerEvents = "auto";
+        popup.classList.add("opacity-100", "scale-100");
+
+        // Hide popup after 3 seconds
+        setTimeout(() => {
+          popup.classList.remove("opacity-100", "scale-100");
+          popup.classList.add("opacity-0", "scale-95");
+          popup.style.pointerEvents = "none";
+        }, 3000);
+      }
+
+      // File Upload Function
+      async function handleFileUpload(event) {
+        const file = event.target.files[0];
+        if (file) {
+          const formData = new FormData();
+          formData.append("file", file);
+
+          try {
+            const response = await fetch("/upload", {
+              method: "POST",
+              body: formData,
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+              showPopup("File uploaded successfully", true);
+              document
+                .getElementById("trainTab")
+                .classList.remove("text-gray-400", "cursor-not-allowed");
+              document
+                .getElementById("trainTab")
+                .classList.add("text-[#0D3B5D]");
+              showTab("train");
+            } else {
+              showPopup(`Error: ${result.error}`, false);
+            }
+          } catch (error) {
+            console.error("File upload failed:", error);
+            showPopup("Failed to upload file. Please try again later.", false);
+          }
+        }
+      }
+
+      // Training Completion Function
+      function handleTrainingCompletion() {
+        const testTab = document.getElementById("testTab");
+        testTab.classList.remove("text-gray-400", "cursor-not-allowed");
+        testTab.classList.add("text-[#0D3B5D]");
+        showTab("test");
+      }
+    </script>
+  </body>
+</html>
