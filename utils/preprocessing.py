@@ -39,7 +39,7 @@ def scale_data(train_data, val_data, test_data, feature_columns):
     train_scaled = val_scaled = test_scaled = None
 
     if train_data is not None:
-        train_scaled = scaler.fit_transform(train_data[feature_columns])
+        train_scaled = scaler.fit_transform(train_data[feature_columns])  
     if val_data is not None:
         val_scaled = scaler.transform(val_data[feature_columns])
     if test_data is not None:

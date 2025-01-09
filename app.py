@@ -148,10 +148,17 @@ def train_model(model_type):
 def predict_model(model_type):
     """Predict wind speed for multiple days using the specified model."""
     try:
-        # Load scaler
-        scaler_path = os.path.join(MODELS_PATH, 'scaler.pkl')
+        # Load the appropriate scaler based on model_type
+        if model_type == 'svm':
+            scaler_path = os.path.join(MODELS_PATH, 'svm_scaler.pkl')
+        elif model_type == 'lstm':
+            scaler_path = os.path.join(MODELS_PATH, 'lstm_scaler.pkl')
+        else:
+            return jsonify({'error': 'Invalid model type. Use "svm" or "lstm".'}), 400
+
         if not os.path.exists(scaler_path):
-            return jsonify({'error': 'Scaler not found. Train the model first.'}), 404
+            return jsonify({'error': f'{model_type.upper()} scaler not found. Train the model first.'}), 404
+
         scaler = joblib.load(scaler_path)
 
         # Get user input
@@ -180,7 +187,7 @@ def predict_model(model_type):
                 # If no historical data, return default empty values for visualization
                 historical_data = pd.DataFrame({
                     'TANGGAL': [forecast_date - pd.Timedelta(days=2), forecast_date - pd.Timedelta(days=1)],
-                    'FF_X': [0, 0]
+                    'FF_AVG': [0, 0]
                 })
 
             # Prepare input for SVM prediction
@@ -205,7 +212,7 @@ def predict_model(model_type):
             dates = list(historical_data['TANGGAL'].dt.strftime('%Y-%m-%d'))
             dates.append(forecast_date.strftime('%Y-%m-%d'))
 
-            historical_predictions = list(historical_data['FF_X'])  # Example feature for visualization
+            historical_predictions = list(historical_data['FF_AVG'])  
             predictions = historical_predictions + [prediction]
 
             response = [{'date': date, 'prediction': pred} for date, pred in zip(dates, predictions)]
@@ -243,7 +250,7 @@ def predict_model(model_type):
             # Prepare response with the last two days and the predicted day
             dates = list(sequence_data['TANGGAL'].dt.strftime('%Y-%m-%d'))
             dates.append(forecast_date.strftime('%Y-%m-%d'))
-            predictions = list(sequence_data['FF_X'])  # Example feature for historical data
+            predictions = list(sequence_data['FF_AVG']) 
             predictions.append(prediction)
 
             response = [{'date': date, 'prediction': pred} for date, pred in zip(dates, predictions)]
@@ -255,6 +262,7 @@ def predict_model(model_type):
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
 
 if __name__ == '__main__':
     app.run(debug=True)
